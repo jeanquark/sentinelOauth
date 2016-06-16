@@ -1,0 +1,313 @@
+# OAuth for Sentinel 2
+
+This post goes about the integration of the Laravel [Socialite](https://github.com/laravel/socialite) package to [Sentinel 2](https://cartalyst.com/manual/sentinel/2.0) for OAuth Authentication. It allows visitors to register and sign in to your application via their own Google, Facebook, LinkedIn or Github account. This is kind of a long article because I will go through the whole installation process, but the code in itself isn't that sophisticated at all so please don't get intimidated by the tiny vertical scroll bar!
+
+## Context
+
+I assume you have a running Laravel app with Sentinel installed. To get a gist of the various steps needed to get up and running with Laravel socialite untied from Sentinel, have a look at this [blog post](https://mattstauffer.co/blog/using-github-authentication-for-login-with-laravel-socialite). If you'd like getting to the same starting point as me, I suggest you install this fresh installed Sentinel [repo](https://jeanquark@bitbucket.org/jeanquark/sentinel.git). Sentinel is an open-source authorization and authentication framework that has all the tools in place for managing an authorization-based application. However, it doesn't come with OAuth functionality natively and instead propose an add-on package called [Sentinel-Social](https://cartalyst.com/manual/sentinel-social/2.0). Now let me be clear on that: I strongly encourage anyone who considers building a serious web app to get an official package release with all the security it brings. Nevertheless, it sometimes helps to get around things by yourself in order to gain a good understanding of how it all works out.
+
+## Process
+
+First get Socialite installed. In your project's directory run
+
+```sh
+composer require laravel/socialite
+```
+
+Update your providers and aliases arrays
+
+*config/app.php*
+```php 
+Laravel\Socialite\SocialiteServiceProvider::class,
+
+// .....
+
+'Socialite'  => Laravel\Socialite\Facades\Socialite::class,
+```
+
+
+
+We first need to register our application to the authentication provider. Let's do so with Google, but the process is quiet similar for other providers. Go to the [Google Developers website](https://developers.google.com/identity/sign-in/web/devconsole-project#buttons) and follow the guidelines to create a new project. Here are the start-up links for the 3 other providers: [Facebook](https://developers.facebook.com/apps/), [linkedin](https://www.linkedin.com/developer/apps), [github](https://github.com/settings/applications). You should provide info like your homepage url (can be http://localhost/[YOUR_APP] if you work locally) and most importantly your callback url. This url may look like this: http://localhost/[YOUR_APP]/login/callback/google, but you are free to opt for something more eccentric as long as you remain consistent throughout the configuration process. For each provider, Socialite will have you reporting 3 values:
+
+1. The callback url 
+2. Your Client ID 
+3. Your Client Secret 
+
+to the config/services page. Of course, for security reasons, we are not going to paste those values directly there. Instead, we will put reference to environment variables and update our .env file.
+
+*config/services.php*
+```php 
+    'google' => [
+        'client_id' => getenv('GOOGLE_CLIENT_ID'),
+        'client_secret' => getenv('GOOGLE_CLIENT_SECRET'),
+        'redirect' => getenv('GOOGLE_URL'),
+    ],
+    'facebook' => [
+        'client_id' => getenv('FACEBOOK_CLIENT_ID'),
+        'client_secret' => getenv('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => getenv('FACEBOOK_URL'),
+    ],
+    'linkedin' => [
+        'client_id' => getenv('LINKEDIN_CLIENT_ID'),
+        'client_secret' => getenv('LINKEDIN_CLIENT_SECRET'),
+        'redirect' => getenv('LINKEDIN_URL'),
+    ],
+    'github' => [
+        'client_id' => getenv('GITHUB_CLIENT_ID'),
+        'client_secret' => getenv('GITHUB_CLIENT_SECRET'),
+        'redirect' => getenv('GITHUB_URL'),
+    ],
+```
+
+*.env*
+```sh 
+GOOGLE_CLIENT_ID=[YOUR_GOOGLE_CLIENT_ID]
+GOOGLE_CLIENT_SECRET=[YOUR_GOOGLE_CLIENT_SECRET]
+GOOGLE_URL=[YOUR_GOOGLE_CALLBACK_URL]
+
+FACEBOOK_CLIENT_ID=[YOUR_FACEBOOK_CLIENT_ID]
+FACEBOOK_CLIENT_SECRET=[YOUR_FACEBOOK_CLIENT_SECRET]
+FACEBOOK_URL=[YOUR_FACEBOOK_CALLBACK_URL]
+
+LINKEDIN_CLIENT_ID=[YOUR_LINKEDIN_CLIENT_ID]
+LINKEDIN_CLIENT_SECRET=[YOUR_LINKEDIN_CLIENT_SECRET]
+LINKEDIN_URL=[YOUR_LINKEDIN_CALLBACK_URL]
+
+GITHUB_CLIENT_ID=[YOUR_GITHUB_CLIENT_ID]
+GITHUB_CLIENT_SECRET=[YOUR_GITUB_CLIENT_SECRET]
+GITHUB_URL=[YOUR_GITHUB_CALLBACK_URL]
+```
+
+Next step is to update our database. Upon successful connection, we will retrieve a whole bunch of user-specific data from the authentication provider, but we'll only keep user id. That will serve as reference for future connections.
+
+```php 
+Schema::create('users', function (Blueprint $table) {
+    $table->increments('id');
+    $table->string('email');
+    $table->string('password');
+    $table->text('permissions')->nullable();
+    $table->timestamp('last_login')->nullable();
+    $table->string('first_name')->nullable();
+    $table->string('last_name')->nullable();
+    $table->string('google_id');
+    $table->string('facebook_id');
+    $table->string('linkedin_id');
+    $table->string('github_id');
+    $table->string('avatar');
+    $table->timestamps();
+
+    $table->engine = 'InnoDB';
+    $table->unique('email');
+});
+```
+
+Note that we also register users avatar. Okay, let's add routes for redirecting users to the OAuth provider and retrieve the callback. 
+
+*Routes.php*
+```php 
+Route::get('login/{provider}', array('as' => 'redirect', 'uses' => 'AuthController@redirectToProvider');
+Route::get('login/callback/{provider}', array('as' => 'callback', 'uses' => 'AuthController@handleProviderCallback');
+```
+
+Following the first route, we provide a redirection link in the login form. It can be a clickable image.
+
+*login.blade.php*
+```php
+<a href="login/google"><img src="images/oauth/google.png" alt="" width="150"></a>
+```
+
+Do the same for any provider you would like to add.
+
+Now let's get to the controller methods. There are 3 of them:
+
+1. The redirectToProvider method will use Socialite facade to redirect user to the proper auth provider.
+2. The handleProviderCallback will try authenticate user by calling the findOrCreateUser method.
+3. The findOrCreateUser checks if user exist and has already used this provider in the past and perform registration if not.
+
+*AuthController.php*
+```php
+class AuthController extends Controller
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Registration & Login Controller
+    |--------------------------------------------------------------------------
+    |
+    | This controller handles the registration of new users, as well as the
+    | authentication of existing users. By default, this controller uses
+    | a simple trait to add these behaviors. Why don't you explore it?
+    |
+    */
+
+    /**
+     * Redirect the user to the GitHub authentication page.
+     *
+     * @return Response
+     */
+    public function redirectToProvider($provider=null)
+    {
+        if(!config("services.$provider")) Response::make("Not Found", 404); //just to handle providers that doesn't exist
+        return Socialite::driver($provider)->redirect();
+    }
+
+    /**
+     * Obtain the user information from GitHub.
+     *
+     * @return Response
+     */
+    /* 4 cases:
+        1.  User register for the first time with Oauth
+        2.  User sign in with Oauth, but is already registered
+        3.  User sign in with Oauth, but has already used another Oauth service
+        4.  User sign with an already used Oauth service
+    */
+    public function handleProviderCallback($provider=null)
+    {
+        try {
+            // Retrieve User data from Oauth service provider
+            //dd($provider);
+            //dd(Socialite::driver('github');
+            //$user = Socialite::driver('github')->user();
+            $user = Socialite::driver($provider)->user();
+            //$user = Socialite::with($provider)->user();
+            //dd($user);
+        } catch (Exception $e) { // Cannot retrieve Oauth user data
+            return Redirect::to('login');
+        }
+        //dd($user);
+        //$authUser = $this->findOrCreateUser($user, $provider);
+        $password = str_random(10);
+        $OAuthUser = $this->findOrCreateUser($user, $provider, $password);
+        //dd($OAuthUser);
+        //Auth::login($authUser, true);
+        //dd($user);
+        try {
+            $user = Sentinel::findById($OAuthUser->id);
+        //dd($user);
+
+        //dd($password);
+
+            if (Sentinel::authenticateOauth($user)) {
+                Sentinel::login($user);
+                return Redirect::route('home')->with('success', 'Welcome <b>' . $user->email . '!</b>');
+            } else {
+                return Redirect::route('login')->with('error', 'Cannot authenticate.');
+            }
+        } catch (NotActivatedException $e) {
+
+            return Redirect::route('login')->with('error', $e->getMessage());
+        }
+
+        //return Redirect::route('home')->with('success', 'Welcome <b>' . $user->email . '!</b>');
+        
+        //return Redirect::route('home');
+    }
+
+    /**
+     * Return user if exists; create and return if doesn't
+     *
+     * @param $githubUser
+     * @return User
+     */
+    //private function findOrCreateUser($githubUser, $provider)
+    private function findOrCreateUser($user, $provider, $password)
+    {
+        //if ($authUser = User::where($provider . '_id', '=', $githubUser->id)->first()) { // User is already registered with this oauth service
+        // Check if user exists
+        if ($userExist = User::where('email', '=', $user->email)->first()) {
+            // Check if user has already registered with this Oauth service provider
+            if ($userProvider = User::where($provider . '_id', '=', $user->id)->first()) { // User is already registered with this oauth service
+                //dd($password);
+                //$credentials = ['email' => $authUser->email, 'password' = $authUser->password];
+                //return $authUser;
+                //dd($user2);
+                return $userProvider;
+            } else { // User exists but has never used this service provider before
+                // Update user with new provider_id
+                $provider1 = $provider . '_id';
+                //dd($provider1);
+                $userExist->$provider1 = $user->id;
+                //$user1->$provider . '_id' = $user->id; 
+                $userExist->save();  
+                //dd($user1);
+                return $userExist;                
+            } // end if
+        } else {
+            // Register and activate new user and proceed to authentication. Return password.
+            
+            /*return User::create([
+                'email' => $user->email,
+                'password' => password_hash($password, PASSWORD_BCRYPT),
+                $provider . '_id' => $user->id,
+                'avatar' => $user->avatar
+            ]);*/
+            
+            //$provider1 = $provider . '_id';
+
+            $credentials = [
+                'email' => $user->email,
+                'password' => $password,
+                $provider . '_id' => $user->id,
+                'avatar' => $user->avatar
+            ];
+
+            $user = Sentinel::register($credentials, false);
+            //dd($user);
+            if ($user) {
+                $role = Sentinel::findRoleBySlug('user');
+
+                $role->users()->attach($user);
+            }
+
+            Session::flash('warning', "You successfully signed in via OAuth <span class='fa fa-smile-o'></span>.<br/>Your default attributed password: <b>$password</b><br/>Take a note of your password now, as you won't be able to access it anymore. You can always sign in with your favorite OAuth service tough.");
+            //dd($user);
+            return $user;
+        } // end if
+    }
+}
+```
+
+Building the specific authenticate method for oauth users
+
+*Sentinel.php*
+```php
+public function authenticateOauth($user, $remember = false, $login = true)
+    {
+        $response = $this->fireEvent('sentinel.authenticating', $user, true);
+
+        if ($response === false) {
+            return false;
+        }
+
+        /*if ($credentials instanceof UserInterface) {
+            $user = $credentials;
+        } else {
+            $user = $this->users->findByCredentials($credentials);
+
+            $valid = $user !== null ? $this->users->validateCredentials($user, $credentials) : false;
+
+            if ($user === null || $valid === false) {
+                $this->cycleCheckpoints('fail', $user, false);
+
+                return false;
+            }
+        }*/
+        //$user = $this->users->findById($OAuthUser->id);
+
+        if (! $this->cycleCheckpoints('login', $user)) {
+            return false;
+        }
+
+        if ($login === true) {
+            $method = $remember === true ? 'loginAndRemember' : 'login';
+
+            if (! $user = $this->{$method}($user)) {
+                return false;
+            }
+        }
+
+        $this->fireEvent('sentinel.authenticated', $user);
+
+        return $this->user = $user;
+    }
+```
