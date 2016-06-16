@@ -33,7 +33,7 @@ Now fill the tables
 php artisan db:seed
 ```
 
-Nice. You should be good to go. Open your web browser and go to the login page of the application project (if you followed above-mentioned directives with xampp, path is: http://localhost/sentinelOauth/public/login). Enter provided admin credentials and start managing users from the admin area.
+Nice. You should be good to go. Open your web browser and go to the login page of the application project (if you followed above-mentioned directives with xampp, path is: http://localhost/sentinelOauth/public/login). You can enter provided admin credentials to start managing users from the admin area. To make use of the OAuth service, you need to register your app to the service provider. I explain how to do it as well as all the steps needed to go from Sentinel to Sentinel OAuth in [this](http://www.jmkleger.com/add-oauth-to-sentinel-2) blog post.
 
 ## Features
 
