@@ -8,7 +8,7 @@ Make sure you have a running web server on your computer (for example xampp). Op
 
 First clone the repo
 ```
-git clone https://jeanquark@bitbucket.org/jeanquark/sentinel.git
+git clone https://github.com/jeanquark/sentinelOauth.git
 ```
 
 Install all dependencies
@@ -55,7 +55,7 @@ Welcome message after signing up with OAuth:
 Welcome message after signing in with OAuth:
 ![welcome_sign_in](https://github.com/jeanquark/sentinelOauth/raw/master/public/welcome_sign_in.png "Welcome sign in")
 
-Admin:
+Admin area:
 ![alt text](https://github.com/jeanquark/sentinelOauth/raw/master/public/admin.png "Admin")
 
 ### License
