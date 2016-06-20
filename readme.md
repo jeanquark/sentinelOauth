@@ -8,7 +8,7 @@ Make sure you have a running web server on your computer (for example xampp). Op
 
 First clone the repo
 ```
-git clone https://jeanquark@bitbucket.org/jeanquark/sentinel.git
+git clone https://github.com/jeanquark/sentinelOauth.git
 ```
 
 Install all dependencies

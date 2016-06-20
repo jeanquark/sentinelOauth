@@ -4,10 +4,16 @@
     "keywords": ["framework", "laravel"],
     "license": "MIT",
     "type": "project",
+	"repositories":[
+        {
+            "type": "vcs",
+            "url": "https://github.com/jeanquark/sentinelBanSuspendOauth"
+        }
+    ],
     "require": {
         "php": ">=5.5.9",
         "laravel/framework": "5.2.*",
-        "cartalyst/sentinel": "2.0.*",
+        "cartalyst/sentinel": "dev-master",
         "laravelcollective/html": "5.2.*",
         "laravel/socialite": "^2.0",
         "hashids/hashids": "^1.0"
