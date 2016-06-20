@@ -1,6 +1,6 @@
 # OAuth service as an extension of the Sentinel 2 package for Laravel 5.2
 
-Allow new users to register and sign in to your application via third party websites like Google, Facebook, Github or LinkedIn. 
+Allow new users to register and sign in to your application via third party websites like Google, Facebook, Github or LinkedIn. All steps are explained in [this](http://www.jmkleger.com/post/add-oauth-to-sentinel-2) blog post.
 
 ## Installation
 
@@ -11,14 +11,9 @@ First clone the repo
 git clone https://github.com/jeanquark/sentinelOauth.git
 ```
 
-Install all dependencies
+cd to the newly created folder and install all dependencies
 ```
 composer install
-```
-
-Generate application key 
-```
-php artisan key:generate
 ```
 
 Create a database that will hold sentinel tables. You can do so with phpmyadmin.
@@ -33,7 +28,12 @@ Now fill the tables
 php artisan db:seed
 ```
 
-Nice. You should be good to go. Open your web browser and go to the login page of the application project (if you followed above-mentioned directives with xampp, path is: http://localhost/sentinelOauth/public/login). You can enter provided admin credentials to start managing users from the admin area. To make use of the OAuth service, you need to register your app to the service provider. I explain how to do it as well as all the steps needed to go from Sentinel to Sentinel OAuth in [this](http://www.jmkleger.com/add-oauth-to-sentinel-2) blog post.
+Generate application key 
+```
+php artisan key:generate
+```
+
+Nice. You should be good to go. Open your web browser and go to the login page of the application project (if you followed above-mentioned directives with xampp, path is: http://localhost/sentinelOauth/public/login). You can enter provided admin credentials to start managing users from the admin area. To make use of the OAuth service, you need to register your app to the service provider. I explain how to do it as well as all the steps needed to go from Sentinel to Sentinel OAuth in [this](http://www.jmkleger.com/post/add-oauth-to-sentinel-2) blog post.
 
 ## Features
 
