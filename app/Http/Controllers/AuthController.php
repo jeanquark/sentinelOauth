@@ -1,18 +1,18 @@
 <?php namespace App\Http\Controllers;
 
-use App\User;
-use Validator;
-use App\Http\Controllers\Controller;
-use Illuminate\Foundation\Auth\ThrottlesLogins;
 use Illuminate\Foundation\Auth\AuthenticatesAndRegistersUsers;
+use Cartalyst\Sentinel\Checkpoints\NotActivatedException;
+use Illuminate\Foundation\Auth\ThrottlesLogins;
+use App\Http\Controllers\Controller;
+use App\User;
 
 use Socialite;
+use Validator;
 use Redirect;
 use Response;
 use Sentinel;
 use Session;
 
-use Cartalyst\Sentinel\Checkpoints\NotActivatedException;
 
 class AuthController extends Controller
 {
@@ -52,28 +52,16 @@ class AuthController extends Controller
     public function handleProviderCallback($provider=null)
     {
         try {
-            // Retrieve User data from Oauth service provider
-            //dd($provider);
-            //dd(Socialite::driver('github');
-            //$user = Socialite::driver('github')->user();
             $user = Socialite::driver($provider)->user();
-            //$user = Socialite::with($provider)->user();
-            //dd($user);
-        } catch (Exception $e) { // Cannot retrieve Oauth user data
+        } catch (Exception $e) { // Cannot retrieve OAuth user data
             return Redirect::to('login');
         }
-        //dd($user);
-        //$authUser = $this->findOrCreateUser($user, $provider);
+
         $password = str_random(10);
         $OAuthUser = $this->findOrCreateUser($user, $provider, $password);
-        //dd($OAuthUser);
-        //Auth::login($authUser, true);
-        //dd($user);
+
         try {
             $user = Sentinel::findById($OAuthUser->id);
-        //dd($user);
-
-        //dd($password);
 
             if (Sentinel::authenticateOauth($user)) {
                 Sentinel::login($user);
@@ -85,10 +73,6 @@ class AuthController extends Controller
 
             return Redirect::route('login')->with('error', $e->getMessage());
         }
-
-        //return Redirect::route('home')->with('success', 'Welcome <b>' . $user->email . '!</b>');
-        
-        //return Redirect::route('home');
     }
 
     /**
@@ -97,40 +81,21 @@ class AuthController extends Controller
      * @param $githubUser
      * @return User
      */
-    //private function findOrCreateUser($githubUser, $provider)
     private function findOrCreateUser($user, $provider, $password)
     {
-        //if ($authUser = User::where($provider . '_id', '=', $githubUser->id)->first()) { // User is already registered with this oauth service
-        // Check if user exists
         if ($userExist = User::where('email', '=', $user->email)->first()) {
-            // Check if user has already registered with this Oauth service provider
             if ($userProvider = User::where($provider . '_id', '=', $user->id)->first()) { // User is already registered with this oauth service
-                //dd($password);
-                //$credentials = ['email' => $authUser->email, 'password' = $authUser->password];
-                //return $authUser;
-                //dd($user2);
                 return $userProvider;
             } else { // User exists but has never used this service provider before
                 // Update user with new provider_id
-                $provider1 = $provider . '_id';
-                //dd($provider1);
-                $userExist->$provider1 = $user->id;
-                //$user1->$provider . '_id' = $user->id; 
+                $new_provider = $provider . '_id';
+                $userExist->$new_provider = $user->id;
                 $userExist->save();  
-                //dd($user1);
+
                 return $userExist;                
             } // end if
         } else {
             // Register and activate new user and proceed to authentication. Return password.
-            
-            /*return User::create([
-                'email' => $user->email,
-                'password' => password_hash($password, PASSWORD_BCRYPT),
-                $provider . '_id' => $user->id,
-                'avatar' => $user->avatar
-            ]);*/
-            
-            //$provider1 = $provider . '_id';
 
             $credentials = [
                 'email' => $user->email,
@@ -140,7 +105,6 @@ class AuthController extends Controller
             ];
 
             $user = Sentinel::register($credentials, false);
-            //dd($user);
             if ($user) {
                 $role = Sentinel::findRoleBySlug('user');
 
@@ -148,11 +112,7 @@ class AuthController extends Controller
             }
 
             Session::flash('warning', "You successfully signed in via OAuth <span class='fa fa-smile-o'></span>.<br/>Your default attributed password: <b>$password</b><br/>Take a note of your password now, as you won't be able to access it anymore. You can always sign in with your favorite OAuth service tough.");
-            //dd($user);
             return $user;
         } // end if
     }
 }
-
-
-
